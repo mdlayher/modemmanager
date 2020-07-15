@@ -227,10 +227,8 @@ type getAllFunc func(ctx context.Context, op dbus.ObjectPath, iface string) (map
 // makeCall produces a callFunc which call's a D-Bus method on an object.
 func makeCall(c *dbus.Conn) callFunc {
 	return func(ctx context.Context, method string, op dbus.ObjectPath, args ...interface{}) (dbus.Variant, error) {
-		obj := c.Object(service, op)
-
 		var out dbus.Variant
-		if err := obj.CallWithContext(ctx, method, 0, args...).Store(&out); err != nil {
+		if err := c.Object(service, op).CallWithContext(ctx, method, 0, args...).Store(&out); err != nil {
 			return dbus.Variant{}, fmt.Errorf("failed to call %q: %w", method, err)
 		}
 
@@ -241,11 +239,11 @@ func makeCall(c *dbus.Conn) callFunc {
 // makeGet produces a getFunc which can fetch an object's property from a D-Bus
 // interface.
 func makeGet(c *dbus.Conn) getFunc {
+	// Adapt a getFunc using the more generic callFunc.
+	call := makeCall(c)
 	return func(ctx context.Context, op dbus.ObjectPath, iface, prop string) (dbus.Variant, error) {
-		obj := c.Object(service, op)
-
-		var out dbus.Variant
-		if err := obj.CallWithContext(ctx, methodGet, 0, iface, prop).Store(&out); err != nil {
+		out, err := call(ctx, methodGet, op, iface, prop)
+		if err != nil {
 			return dbus.Variant{}, fmt.Errorf("failed to get property %q for %q: %w",
 				prop, iface, err)
 		}
@@ -258,10 +256,8 @@ func makeGet(c *dbus.Conn) getFunc {
 // from a D-Bus interface.
 func makeGetAll(c *dbus.Conn) getAllFunc {
 	return func(ctx context.Context, op dbus.ObjectPath, iface string) (map[string]dbus.Variant, error) {
-		obj := c.Object(service, op)
-
 		var out map[string]dbus.Variant
-		if err := obj.CallWithContext(ctx, methodGetAll, 0, iface).Store(&out); err != nil {
+		if err := c.Object(service, op).CallWithContext(ctx, methodGetAll, 0, iface).Store(&out); err != nil {
 			return nil, fmt.Errorf("failed to get all properties for %q: %w",
 				iface, err)
 		}
