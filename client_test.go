@@ -3,6 +3,7 @@ package modemmanager
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -123,6 +124,73 @@ func TestClientModemOK(t *testing.T) {
 	}
 }
 
+func TestClientForEachModemOK(t *testing.T) {
+	var count int
+	c := &Client{
+		getAll: func(_ context.Context, _ dbus.ObjectPath, _ string) (map[string]dbus.Variant, error) {
+			// Count the number of modems returned and eventually end iteration
+			// by returning unknown method.
+			defer func() { count++ }()
+			if count > 2 {
+				return nil, dbus.Error{Name: unknownMethodError}
+			}
+
+			return map[string]dbus.Variant{
+				"Device": dbus.MakeVariant(fmt.Sprintf("test%d", count)),
+			}, nil
+		},
+	}
+
+	// Gather all of the possible modems for comparison.
+	var modems []*Modem
+	err := c.ForEachModem(context.Background(), func(_ context.Context, m *Modem) error {
+		modems = append(modems, m)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("failed to iterate modems: %v", err)
+	}
+
+	want := []*Modem{
+		{
+			Index:  0,
+			Device: "test0",
+		},
+		{
+			Index:  1,
+			Device: "test1",
+		},
+		{
+			Index:  2,
+			Device: "test2",
+		},
+	}
+
+	if diff := cmp.Diff(want, modems, cmpopts.IgnoreUnexported(Modem{})); diff != "" {
+		t.Fatalf("unexpected modems (-want +got):\n%s", diff)
+	}
+}
+
+func TestClientForEachModemError(t *testing.T) {
+	c := &Client{
+		getAll: func(_ context.Context, _ dbus.ObjectPath, _ string) (map[string]dbus.Variant, error) {
+			// Always return a modem.
+			return map[string]dbus.Variant{
+				"Device": dbus.MakeVariant("test"),
+			}, nil
+		},
+	}
+
+	err := c.ForEachModem(context.Background(), func(_ context.Context, _ *Modem) error {
+		// Suppose the caller invokes a privileged method here which returns an
+		// error due to insufficient permissions.
+		return os.ErrPermission
+	})
+	if !errors.Is(err, os.ErrPermission) {
+		t.Fatalf("expected permission denied, but got: %v", err)
+	}
+}
+
 func TestIntegrationClient(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -141,16 +209,11 @@ func TestIntegrationClient(t *testing.T) {
 	t.Logf("ModemManager: v%s", c.Version)
 
 	// Iterate through each connected modem until a new modem does not exist.
-	for i := 0; ; i++ {
-		m, err := c.Modem(ctx, i)
-		if err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				break
-			}
-
-			t.Fatalf("failed to get modem %d: %v", i, err)
-		}
-
-		t.Logf("- modem %d: %s", i, m.Device)
+	err = c.ForEachModem(ctx, func(ctx context.Context, m *Modem) error {
+		t.Logf("- modem %d: %s", m.Index, m.Device)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("failed to iterate modems: %v", err)
 	}
 }

@@ -107,6 +107,27 @@ func (c *Client) Modem(ctx context.Context, index int) (*Modem, error) {
 	return m, nil
 }
 
+// ForEachModem iterates and invokes fn for each Modem fetched from
+// ModemManager. Iteration halts when no more Modems exist or the input function
+// returns an error.
+func (c *Client) ForEachModem(ctx context.Context, fn func(ctx context.Context, m *Modem) error) error {
+	for i := 0; ; i++ {
+		m, err := c.Modem(ctx, i)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				// Halt iteration due to no more modems.
+				return nil
+			}
+
+			return err
+		}
+
+		if err := fn(ctx, m); err != nil {
+			return err
+		}
+	}
+}
+
 // parse parses a properties map into the Modem's fields.
 func (m *Modem) parse(ps map[string]dbus.Variant) error {
 	for k, v := range ps {
