@@ -8,6 +8,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/godbus/dbus/v5"
 )
@@ -21,9 +22,13 @@ const (
 	methodGet    = "org.freedesktop.DBus.Properties.Get"
 	methodGetAll = "org.freedesktop.DBus.Properties.GetAll"
 
-	// Well-known error names.
+	// Well-known error names which map to Go error types.
+	//
+	// os.ErrNotExist
 	unknownMethodError  = "org.freedesktop.DBus.Error.UnknownMethod"
 	serviceUnknownError = "org.freedesktop.DBus.Error.ServiceUnknown"
+	// os.ErrPermission
+	unauthorizedError = "org.freedesktop.ModemManager1.Error.Core.Unauthorized"
 )
 
 // A Client allows control of ModemManager.
@@ -33,6 +38,7 @@ type Client struct {
 	// Functions which normally manipulate D-Bus but are also swappable for
 	// tests.
 	close  func() error
+	call   callFunc
 	get    getFunc
 	getAll getAllFunc
 }
@@ -50,6 +56,7 @@ func Dial(ctx context.Context) (*Client, error) {
 		// Wrap the *dbus.Conn completely to abstract away all of the low-level
 		// D-Bus logic for ease of unit testing.
 		close:  conn.Close,
+		call:   makeCall(conn),
 		get:    makeGet(conn),
 		getAll: makeGetAll(conn),
 	})
@@ -128,6 +135,24 @@ func (c *Client) ForEachModem(ctx context.Context, fn func(ctx context.Context, 
 	}
 }
 
+// GetNetworkTime fetches the current time from a Modem's network. If permission
+// is denied by D-Bus, an error compatible with 'errors.Is(err,
+// os.ErrPermission)' is returned.
+func (m *Modem) GetNetworkTime(ctx context.Context) (time.Time, error) {
+	v, err := m.c.call(
+		ctx,
+		interfacePath("Modem", "Time", "GetNetworkTime"),
+		objectPath("Modem", strconv.Itoa(m.Index)),
+	)
+	if err != nil {
+		return time.Time{}, toPermission(err)
+	}
+
+	// The time is actually ISO 8601 but it seems that RFC 3339 is close enough:
+	// https://stackoverflow.com/questions/522251/whats-the-difference-between-iso-8601-and-rfc-3339-date-formats
+	return time.Parse(time.RFC3339, v.Value().(string))
+}
+
 // parse parses a properties map into the Modem's fields.
 func (m *Modem) parse(ps map[string]dbus.Variant) error {
 	for k, v := range ps {
@@ -151,7 +176,21 @@ func toNotExist(err error, name string) error {
 		return err
 	}
 
-	return fmt.Errorf("not found: %v: %w", derr, os.ErrNotExist)
+	// Also return the input error which may have wrapped the dbus.Error.
+	return fmt.Errorf("not found: %v: %w", err, os.ErrNotExist)
+}
+
+// toPermission converts a D-Bus unauthorized error to a wrapped error
+// containing os.ErrPermission. If the error is not a dbus.Error or does not
+// have a matching name, it returns the input error.
+func toPermission(err error) error {
+	var derr dbus.Error
+	if !errors.As(err, &derr) || derr.Name != unauthorizedError {
+		return err
+	}
+
+	// Also return the input error which may have wrapped the dbus.Error.
+	return fmt.Errorf("permission denied: %v: %w", err, os.ErrPermission)
 }
 
 // objectPath prepends its arguments with the base object path for ModemManager.
@@ -176,11 +215,28 @@ func interfacePath(ss ...string) string {
 	return strings.Join(append([]string{service}, ss...), ".")
 }
 
+// A callFunc is a function which calls a D-Bus method on an object.
+type callFunc func(ctx context.Context, method string, op dbus.ObjectPath, args ...interface{}) (dbus.Variant, error)
+
 // A getFunc is a function which fetches a D-Bus property from an object.
 type getFunc func(ctx context.Context, op dbus.ObjectPath, iface, prop string) (dbus.Variant, error)
 
 // A getAllFunc is a function which fetches all of an object's D-Bus properties.
 type getAllFunc func(ctx context.Context, op dbus.ObjectPath, iface string) (map[string]dbus.Variant, error)
+
+// makeCall produces a callFunc which call's a D-Bus method on an object.
+func makeCall(c *dbus.Conn) callFunc {
+	return func(ctx context.Context, method string, op dbus.ObjectPath, args ...interface{}) (dbus.Variant, error) {
+		obj := c.Object(service, op)
+
+		var out dbus.Variant
+		if err := obj.CallWithContext(ctx, method, 0, args...).Store(&out); err != nil {
+			return dbus.Variant{}, fmt.Errorf("failed to call %q: %w", method, err)
+		}
+
+		return out, nil
+	}
+}
 
 // makeGet produces a getFunc which can fetch an object's property from a D-Bus
 // interface.
