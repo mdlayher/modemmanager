@@ -85,8 +85,18 @@ func (c *Client) Close() error { return c.close() }
 
 // A Modem is a device controlled by ModemManager.
 type Modem struct {
-	Index  int
-	Device string
+	Index                        int
+	CarrierConfiguration         string
+	CarrierConfigurationRevision string
+	Device                       string
+	DeviceIdentifier             string
+	EquipmentIdentifier          string
+	HardwareRevision             string
+	Manufacturer                 string
+	Model                        string
+	Plugin                       string
+	PrimaryPort                  string
+	Revision                     string
 
 	c *Client
 }
@@ -171,8 +181,28 @@ func (m *Modem) parse(ps map[string]dbus.Variant) error {
 		// with vp.Err if the types don't match as expected.
 		vp := newValueParser(v)
 		switch k {
+		case "CarrierConfiguration":
+			m.CarrierConfiguration = vp.String()
+		case "CarrierConfigurationRevision":
+			m.CarrierConfigurationRevision = vp.String()
 		case "Device":
 			m.Device = vp.String()
+		case "DeviceIdentifier":
+			m.DeviceIdentifier = vp.String()
+		case "EquipmentIdentifier":
+			m.EquipmentIdentifier = vp.String()
+		case "HardwareRevision":
+			m.HardwareRevision = vp.String()
+		case "Manufacturer":
+			m.Manufacturer = vp.String()
+		case "Model":
+			m.Model = vp.String()
+		case "Plugin":
+			m.Plugin = vp.String()
+		case "PrimaryPort":
+			m.PrimaryPort = vp.String()
+		case "Revision":
+			m.Revision = vp.String()
 		}
 
 		if err := vp.Err(); err != nil {

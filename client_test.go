@@ -79,6 +79,24 @@ func Test_initClientError(t *testing.T) {
 func TestClientModemNotFound(t *testing.T) {
 	c := &Client{
 		getAll: func(_ context.Context, _ dbus.ObjectPath, _ string) (map[string]dbus.Variant, error) {
+			// Device must be a string, not an integer.
+			return map[string]dbus.Variant{
+				"Device": dbus.MakeVariant(1),
+			}, nil
+		},
+	}
+
+	_, err := c.Modem(context.Background(), 0)
+	if err == nil {
+		t.Fatal("expected an error, but none occurred")
+	}
+
+	t.Logf("err: %v", err)
+}
+
+func TestClientModemBadType(t *testing.T) {
+	c := &Client{
+		getAll: func(_ context.Context, _ dbus.ObjectPath, _ string) (map[string]dbus.Variant, error) {
 			// D-Bus returns "unknown method" when a modem doesn't exist at the
 			// input index.
 			return nil, dbus.Error{Name: unknownMethodError}
@@ -105,9 +123,19 @@ func TestClientModemOK(t *testing.T) {
 				t.Fatalf("unexpected interface (-want +got):\n%s", diff)
 			}
 
-			// TODO: return more fields!
+			// Test data copied from mdlayher's modem with some tweaks.
 			return map[string]dbus.Variant{
-				"Device": dbus.MakeVariant("test"),
+				"CarrierConfiguration":         dbus.MakeVariant(""),
+				"CarrierConfigurationRevision": dbus.MakeVariant(""),
+				"Device":                       dbus.MakeVariant("/sys/devices/pci0000:00/0000:00:13.0/usb1/1-1/1-1.3"),
+				"DeviceIdentifier":             dbus.MakeVariant("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"),
+				"EquipmentIdentifier":          dbus.MakeVariant("123456789012345"),
+				"HardwareRevision":             dbus.MakeVariant("MC7455"),
+				"Manufacturer":                 dbus.MakeVariant("Sierra Wireless, Incorporated"),
+				"Model":                        dbus.MakeVariant("Sierra Wireless MC7455 Qualcomm® Snapdragon™ X7 LTE-A"),
+				"Plugin":                       dbus.MakeVariant("Sierra"),
+				"PrimaryPort":                  dbus.MakeVariant("cdc-wdm0"),
+				"Revision":                     dbus.MakeVariant("SWI9X30C_02.33.03.00"),
 			}, nil
 		},
 	}
@@ -117,8 +145,18 @@ func TestClientModemOK(t *testing.T) {
 		t.Fatalf("failed to get modem 0: %v", err)
 	}
 
-	// TODO: parse more fields!
-	want := &Modem{Device: "test"}
+	want := &Modem{
+		Device:              "/sys/devices/pci0000:00/0000:00:13.0/usb1/1-1/1-1.3",
+		DeviceIdentifier:    "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+		EquipmentIdentifier: "123456789012345",
+		HardwareRevision:    "MC7455",
+		Manufacturer:        "Sierra Wireless, Incorporated",
+		Model:               "Sierra Wireless MC7455 Qualcomm® Snapdragon™ X7 LTE-A",
+		Plugin:              "Sierra",
+		PrimaryPort:         "cdc-wdm0",
+		Revision:            "SWI9X30C_02.33.03.00",
+	}
+
 	if diff := cmp.Diff(want, m, cmpopts.IgnoreUnexported(Modem{})); diff != "" {
 		t.Fatalf("unexpected Modem (-want +got):\n%s", diff)
 	}
