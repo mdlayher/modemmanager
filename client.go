@@ -71,7 +71,12 @@ func initClient(ctx context.Context, c *Client) (*Client, error) {
 		return nil, toNotExist(err, serviceUnknownError)
 	}
 
-	c.Version = v.Value().(string)
+	vp := newValueParser(v)
+	c.Version = vp.String()
+	if err := vp.Err(); err != nil {
+		return nil, fmt.Errorf("failed to parse ModemManager version: %v", err)
+	}
+
 	return c, nil
 }
 
@@ -148,19 +153,30 @@ func (m *Modem) GetNetworkTime(ctx context.Context) (time.Time, error) {
 		return time.Time{}, toPermission(err)
 	}
 
+	vp := newValueParser(v)
+	str := vp.String()
+	if err := vp.Err(); err != nil {
+		return time.Time{}, err
+	}
+
 	// The time is actually ISO 8601 but it seems that RFC 3339 is close enough:
 	// https://stackoverflow.com/questions/522251/whats-the-difference-between-iso-8601-and-rfc-3339-date-formats
-	return time.Parse(time.RFC3339, v.Value().(string))
+	return time.Parse(time.RFC3339, str)
 }
 
 // parse parses a properties map into the Modem's fields.
 func (m *Modem) parse(ps map[string]dbus.Variant) error {
 	for k, v := range ps {
-		// TODO: copy the atmodem valueParser code.
-		v := v.Value()
+		// Parse every dbus.Variant as a well-typed value, or return an error
+		// with vp.Err if the types don't match as expected.
+		vp := newValueParser(v)
 		switch k {
 		case "Device":
-			m.Device = v.(string)
+			m.Device = vp.String()
+		}
+
+		if err := vp.Err(); err != nil {
+			return fmt.Errorf("error parsing %q: %v", k, err)
 		}
 	}
 
