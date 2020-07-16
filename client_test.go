@@ -271,7 +271,7 @@ func TestModemGetNetworkTimeOK(t *testing.T) {
 		t.Fatalf("failed to get network time: %v", err)
 	}
 
-	want := time.Date(2020, time.July, 15, 16, 31, 2, 0, time.FixedZone("EDT", -4*60*60))
+	want := time.Date(2020, time.July, 15, 12, 31, 2, 0, time.FixedZone("EDT", -4*60*60))
 	if diff := cmp.Diff(want, now); diff != "" {
 		t.Fatalf("unexpected time (-want +got):\n%s", diff)
 	}

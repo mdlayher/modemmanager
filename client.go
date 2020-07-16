@@ -175,7 +175,20 @@ func (m *Modem) GetNetworkTime(ctx context.Context) (time.Time, error) {
 
 	// The time is actually ISO 8601 but it seems that RFC 3339 is close enough:
 	// https://stackoverflow.com/questions/522251/whats-the-difference-between-iso-8601-and-rfc-3339-date-formats
-	return time.Parse(time.RFC3339, str)
+	t, err := time.Parse(time.RFC3339, str)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	// This feels like a hack and a misintepretation, but it seems that the time
+	// string returned by modems contains a time zone offset but is actually
+	// returned in UTC. We interpret the non-zone portions as a UTC time and
+	// then convert that UTC time back to the time string's correct zone to
+	// return the true time.
+	y, mon, d := t.Date()
+	hh, mm, ss := t.Clock()
+
+	return time.Date(y, mon, d, hh, mm, ss, 0, time.UTC).In(t.Location()), nil
 }
 
 // SignalSetup sets the modem's extended signal quality refresh rate in seconds,
