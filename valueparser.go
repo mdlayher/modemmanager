@@ -23,6 +23,21 @@ func newValueParser(v dbus.Variant) *valueParser {
 // Err returns the current parsing error, if there is one.
 func (vp *valueParser) Err() error { return vp.err }
 
+// Float64 parses the value as a float64.
+func (vp *valueParser) Float64() float64 {
+	if vp.err != nil {
+		return 0
+	}
+
+	f, ok := vp.v.(float64)
+	if !ok {
+		vp.err = errors.New("value is not of type float64")
+		return 0
+	}
+
+	return f
+}
+
 // String parses the value as a string.
 func (vp *valueParser) String() string {
 	if vp.err != nil {

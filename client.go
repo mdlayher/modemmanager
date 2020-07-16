@@ -84,6 +84,10 @@ func initClient(ctx context.Context, c *Client) (*Client, error) {
 func (c *Client) Close() error { return c.close() }
 
 // A Modem is a device controlled by ModemManager.
+//
+// Calling methods on a modem requires elevated privileges. If permission is
+// denied by D-Bus, an error compatible with 'errors.Is(err, os.ErrPermission)'
+// is returned when methods are called.
 type Modem struct {
 	Index                        int
 	CarrierConfiguration         string
@@ -150,14 +154,14 @@ func (c *Client) ForEachModem(ctx context.Context, fn func(ctx context.Context, 
 	}
 }
 
-// GetNetworkTime fetches the current time from a Modem's network. If permission
-// is denied by D-Bus, an error compatible with 'errors.Is(err,
-// os.ErrPermission)' is returned.
+// GetNetworkTime fetches the current time from a Modem's network.
 func (m *Modem) GetNetworkTime(ctx context.Context) (time.Time, error) {
-	v, err := m.c.call(
+	var v dbus.Variant
+	err := m.c.call(
 		ctx,
 		interfacePath("Modem", "Time", "GetNetworkTime"),
 		objectPath("Modem", strconv.Itoa(m.Index)),
+		&v,
 	)
 	if err != nil {
 		return time.Time{}, toPermission(err)
@@ -172,6 +176,48 @@ func (m *Modem) GetNetworkTime(ctx context.Context) (time.Time, error) {
 	// The time is actually ISO 8601 but it seems that RFC 3339 is close enough:
 	// https://stackoverflow.com/questions/522251/whats-the-difference-between-iso-8601-and-rfc-3339-date-formats
 	return time.Parse(time.RFC3339, str)
+}
+
+// SignalSetup sets the modem's extended signal quality refresh rate in seconds,
+// enabling future calls to Signal to return updated signal strength data. Any
+// fractional time values are rounded to the nearest second.
+func (m *Modem) SignalSetup(ctx context.Context, rate time.Duration) error {
+	err := m.c.call(
+		ctx,
+		interfacePath("Modem", "Signal", "Setup"),
+		objectPath("Modem", strconv.Itoa(m.Index)),
+		// No output, pass time in seconds as argument.
+		nil,
+		uint32(rate.Round(time.Second).Seconds()),
+	)
+	if err != nil {
+		return toPermission(err)
+	}
+
+	return nil
+}
+
+// Signal contains cellular network extended signal quality information.
+type Signal struct {
+	Rate time.Duration
+	LTE  struct {
+		RSRP, RSRQ, RSSI, SNR float64
+	}
+}
+
+// Signal returns cellular network extended signal quality information from the
+// Modem. The refresh rate of the data can be controlled using SignalSetup.
+func (m *Modem) Signal(ctx context.Context) (*Signal, error) {
+	ps, err := m.c.getAll(
+		ctx,
+		objectPath("Modem", strconv.Itoa(m.Index)),
+		interfacePath("Modem", "Signal"),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseSignal(ps)
 }
 
 // parse parses a properties map into the Modem's fields.
@@ -207,6 +253,58 @@ func (m *Modem) parse(ps map[string]dbus.Variant) error {
 
 		if err := vp.Err(); err != nil {
 			return fmt.Errorf("error parsing %q: %v", k, err)
+		}
+	}
+
+	return nil
+}
+
+// parseSignal parses a properties map into Signal data.
+func parseSignal(ps map[string]dbus.Variant) (*Signal, error) {
+	var s Signal
+	for k, v := range ps {
+		switch v := v.Value().(type) {
+		case uint32:
+			// Only Rate is expected for uint32.
+			if k == "Rate" {
+				s.Rate = time.Duration(v) * time.Second
+			}
+		case map[string]dbus.Variant:
+			// Cellular network data maps.
+			// TODO: parse other cellular network data.
+			var err error
+			switch k {
+			case "Lte":
+				l := &s.LTE
+				err = parseLTESignal(v, &l.RSRP, &l.RSRQ, &l.RSSI, &l.SNR)
+			}
+
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return &s, nil
+}
+
+// parseLTESignal parses a properties map into LTE data fields.
+func parseLTESignal(ps map[string]dbus.Variant, rsrp, rsrq, rssi, snr *float64) error {
+	for k, v := range ps {
+		vp := newValueParser(v)
+		switch k {
+		case "rsrp":
+			*rsrp = vp.Float64()
+		case "rsrq":
+			*rsrq = vp.Float64()
+		case "rssi":
+			*rssi = vp.Float64()
+		case "snr":
+			*snr = vp.Float64()
+		}
+
+		if err := vp.Err(); err != nil {
+			return fmt.Errorf("error parsing LTE signal key %q: %v", k, err)
 		}
 	}
 
@@ -261,8 +359,9 @@ func interfacePath(ss ...string) string {
 	return strings.Join(append([]string{service}, ss...), ".")
 }
 
-// A callFunc is a function which calls a D-Bus method on an object.
-type callFunc func(ctx context.Context, method string, op dbus.ObjectPath, args ...interface{}) (dbus.Variant, error)
+// A callFunc is a function which calls a D-Bus method on an object and
+// optionally stores its output in the pointer provided to out.
+type callFunc func(ctx context.Context, method string, op dbus.ObjectPath, out interface{}, args ...interface{}) error
 
 // A getFunc is a function which fetches a D-Bus property from an object.
 type getFunc func(ctx context.Context, op dbus.ObjectPath, iface, prop string) (dbus.Variant, error)
@@ -272,13 +371,18 @@ type getAllFunc func(ctx context.Context, op dbus.ObjectPath, iface string) (map
 
 // makeCall produces a callFunc which call's a D-Bus method on an object.
 func makeCall(c *dbus.Conn) callFunc {
-	return func(ctx context.Context, method string, op dbus.ObjectPath, args ...interface{}) (dbus.Variant, error) {
-		var out dbus.Variant
-		if err := c.Object(service, op).CallWithContext(ctx, method, 0, args...).Store(&out); err != nil {
-			return dbus.Variant{}, fmt.Errorf("failed to call %q: %w", method, err)
+	return func(ctx context.Context, method string, op dbus.ObjectPath, out interface{}, args ...interface{}) error {
+		call := c.Object(service, op).CallWithContext(ctx, method, 0, args...)
+		if call.Err != nil {
+			return fmt.Errorf("failed to call %q: %w", method, call.Err)
 		}
 
-		return out, nil
+		// Store the results of the call only when out is not nil.
+		if out == nil {
+			return nil
+		}
+
+		return call.Store(out)
 	}
 }
 
@@ -288,8 +392,8 @@ func makeGet(c *dbus.Conn) getFunc {
 	// Adapt a getFunc using the more generic callFunc.
 	call := makeCall(c)
 	return func(ctx context.Context, op dbus.ObjectPath, iface, prop string) (dbus.Variant, error) {
-		out, err := call(ctx, methodGet, op, iface, prop)
-		if err != nil {
+		var out dbus.Variant
+		if err := call(ctx, methodGet, op, &out, iface, prop); err != nil {
 			return dbus.Variant{}, fmt.Errorf("failed to get property %q for %q: %w",
 				prop, iface, err)
 		}
@@ -301,9 +405,11 @@ func makeGet(c *dbus.Conn) getFunc {
 // makeGetAll produces a getAllFunc which fetches all of an object's properties
 // from a D-Bus interface.
 func makeGetAll(c *dbus.Conn) getAllFunc {
+	// Adapt a getAllFunc using the more generic callFunc.
+	call := makeCall(c)
 	return func(ctx context.Context, op dbus.ObjectPath, iface string) (map[string]dbus.Variant, error) {
 		var out map[string]dbus.Variant
-		if err := c.Object(service, op).CallWithContext(ctx, methodGetAll, 0, iface).Store(&out); err != nil {
+		if err := call(ctx, methodGetAll, op, &out, iface); err != nil {
 			return nil, fmt.Errorf("failed to get all properties for %q: %w",
 				iface, err)
 		}
