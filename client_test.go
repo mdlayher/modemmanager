@@ -125,6 +125,9 @@ func TestClientModemOK(t *testing.T) {
 
 			// Test data copied from mdlayher's modem with some tweaks.
 			return map[string]dbus.Variant{
+				"Bearers": dbus.MakeVariant([]dbus.ObjectPath{
+					"/org/freedesktop/ModemManager1/Bearer/0",
+				}),
 				"CarrierConfiguration":         dbus.MakeVariant(""),
 				"CarrierConfigurationRevision": dbus.MakeVariant(""),
 				"Device":                       dbus.MakeVariant("/sys/devices/pci0000:00/0000:00:13.0/usb1/1-1/1-1.3"),
@@ -195,9 +198,13 @@ func TestClientModemOK(t *testing.T) {
 		PrimaryPort: "cdc-wdm0",
 		Revision:    "SWI9X30C_02.33.03.00",
 		State:       StateConnected,
+
+		bearers: []dbus.ObjectPath{"/org/freedesktop/ModemManager1/Bearer/0"},
 	}
 
-	if diff := cmp.Diff(want, m, cmpopts.IgnoreUnexported(Modem{})); diff != "" {
+	// Ignore the internal Client but allow comparison of other fields such as
+	// bearers.
+	if diff := cmp.Diff(want, m, cmp.AllowUnexported(Modem{}), cmpopts.IgnoreFields(Modem{}, "c")); diff != "" {
 		t.Fatalf("unexpected Modem (-want +got):\n%s", diff)
 	}
 }

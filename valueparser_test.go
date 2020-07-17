@@ -34,6 +34,13 @@ func Test_valueParserErrors(t *testing.T) {
 			},
 		},
 		{
+			name: "object paths",
+			v:    dbus.MakeVariant(1),
+			fn: func(vp *valueParser) {
+				_ = vp.ObjectPaths()
+			},
+		},
+		{
 			name: "ports type",
 			v:    dbus.MakeVariant(1),
 			fn: func(vp *valueParser) {

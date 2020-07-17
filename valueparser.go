@@ -71,6 +71,21 @@ func (vp *valueParser) String() string {
 	return s
 }
 
+// ObjectPaths parses the value as a slice of dbus.ObjectPaths.
+func (vp *valueParser) ObjectPaths() []dbus.ObjectPath {
+	if vp.err != nil {
+		return nil
+	}
+
+	op, ok := vp.v.([]dbus.ObjectPath)
+	if !ok {
+		vp.err = errors.New("value is not an D-Bus object paths slice")
+		return nil
+	}
+
+	return op
+}
+
 // Ports parses the value as a slice of Ports.
 func (vp *valueParser) Ports() []Port {
 	if vp.err != nil {

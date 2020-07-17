@@ -105,7 +105,8 @@ type Modem struct {
 	Revision                     string
 	State                        State
 
-	c *Client
+	c       *Client
+	bearers []dbus.ObjectPath
 }
 
 //go:generate stringer -type=PortType,PowerState,State -output strings.go
@@ -300,6 +301,8 @@ func (m *Modem) parse(ps map[string]dbus.Variant) error {
 		// with vp.Err if the types don't match as expected.
 		vp := newValueParser(v)
 		switch k {
+		case "Bearers":
+			m.bearers = vp.ObjectPaths()
 		case "CarrierConfiguration":
 			m.CarrierConfiguration = vp.String()
 		case "CarrierConfigurationRevision":
