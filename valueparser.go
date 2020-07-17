@@ -24,6 +24,21 @@ func newValueParser(v dbus.Variant) *valueParser {
 // Err returns the current parsing error, if there is one.
 func (vp *valueParser) Err() error { return vp.err }
 
+// Bool parses the value as a bool.
+func (vp *valueParser) Bool() bool {
+	if vp.err != nil {
+		return false
+	}
+
+	b, ok := vp.v.(bool)
+	if !ok {
+		vp.err = errors.New("value is not of type bool")
+		return false
+	}
+
+	return b
+}
+
 // Float64 parses the value as a float64.
 func (vp *valueParser) Float64() float64 {
 	if vp.err != nil {

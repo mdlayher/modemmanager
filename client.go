@@ -215,6 +215,52 @@ func (c *Client) ForEachModem(ctx context.Context, fn func(ctx context.Context, 
 	}
 }
 
+// A Bearer handles the cellular connection state of a Modem.
+type Bearer struct {
+	Index     int
+	Connected bool
+
+	c *Client
+}
+
+// Bearers returns all of the Bearers for a Modem.
+func (m *Modem) Bearers(ctx context.Context) ([]*Bearer, error) {
+	bs := make([]*Bearer, 0, len(m.bearers))
+	for _, op := range m.bearers {
+		// Fetch all of the properties from the Bearers associated with this
+		// Modem.
+		ps, err := m.c.getAll(
+			ctx,
+			op,
+			interfacePath("Bearer"),
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Note the Bearer's index in the struct by fetching that index from
+		// the last element of the D-Bus object path.
+		idx, err := strconv.Atoi(path.Base(string(op)))
+		if err != nil {
+			return nil, err
+		}
+
+		// Parse all of the properties into the Bearer's exported fields.
+		b := &Bearer{
+			Index: idx,
+			c:     m.c,
+		}
+
+		if err := b.parse(ps); err != nil {
+			return nil, err
+		}
+
+		bs = append(bs, b)
+	}
+
+	return bs, nil
+}
+
 // GetNetworkTime fetches the current time from a Modem's network.
 func (m *Modem) GetNetworkTime(ctx context.Context) (time.Time, error) {
 	var v dbus.Variant
@@ -331,6 +377,25 @@ func (m *Modem) parse(ps map[string]dbus.Variant) error {
 			m.Revision = vp.String()
 		case "State":
 			m.State = State(vp.Int())
+		}
+
+		if err := vp.Err(); err != nil {
+			return fmt.Errorf("error parsing %q: %v", k, err)
+		}
+	}
+
+	return nil
+}
+
+// parse parses a properties map into the Bearer's fields.
+func (b *Bearer) parse(ps map[string]dbus.Variant) error {
+	for k, v := range ps {
+		// Parse every dbus.Variant as a well-typed value, or return an error
+		// with vp.Err if the types don't match as expected.
+		vp := newValueParser(v)
+		switch k {
+		case "Connected":
+			b.Connected = vp.Bool()
 		}
 
 		if err := vp.Err(); err != nil {

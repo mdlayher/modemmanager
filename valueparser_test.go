@@ -13,6 +13,13 @@ func Test_valueParserErrors(t *testing.T) {
 		fn   func(vp *valueParser)
 	}{
 		{
+			name: "bool",
+			v:    dbus.MakeVariant("foo"),
+			fn: func(vp *valueParser) {
+				_ = vp.Bool()
+			},
+		},
+		{
 			name: "float64",
 			v:    dbus.MakeVariant("foo"),
 			fn: func(vp *valueParser) {
