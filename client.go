@@ -99,10 +99,36 @@ type Modem struct {
 	Manufacturer                 string
 	Model                        string
 	Plugin                       string
+	Ports                        []Port
 	PrimaryPort                  string
 	Revision                     string
 
 	c *Client
+}
+
+//go:generate stringer -type=PortType -output strings.go
+
+// A PortType is the type of a modem port.
+type PortType int
+
+// Possible PortType values, taken from:
+// https://www.freedesktop.org/software/ModemManager/api/latest/ModemManager-Flags-and-Enumerations.html#MMModemPortType.
+const (
+	_ PortType = iota
+	PortTypeUnknown
+	PortTypeNet
+	PortTypeAT
+	PortTypeQCDM
+	PortTypeGPS
+	PortTypeQMI
+	PortTypeMBIM
+	PortTypeAudio
+)
+
+// A Port is a modem port.
+type Port struct {
+	Name string
+	Type PortType
 }
 
 // Modem fetches a Modem identified by an index. If the modem does not exist,
@@ -258,6 +284,8 @@ func (m *Modem) parse(ps map[string]dbus.Variant) error {
 			m.Model = vp.String()
 		case "Plugin":
 			m.Plugin = vp.String()
+		case "Ports":
+			m.Ports = vp.Ports()
 		case "PrimaryPort":
 			m.PrimaryPort = vp.String()
 		case "Revision":

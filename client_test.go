@@ -134,8 +134,26 @@ func TestClientModemOK(t *testing.T) {
 				"Manufacturer":                 dbus.MakeVariant("Sierra Wireless, Incorporated"),
 				"Model":                        dbus.MakeVariant("Sierra Wireless MC7455 Qualcomm® Snapdragon™ X7 LTE-A"),
 				"Plugin":                       dbus.MakeVariant("Sierra"),
-				"PrimaryPort":                  dbus.MakeVariant("cdc-wdm0"),
-				"Revision":                     dbus.MakeVariant("SWI9X30C_02.33.03.00"),
+				"Ports": dbus.MakeVariant([][]interface{}{
+					{
+						"cdc-wdm0",
+						uint32(PortTypeMBIM),
+					},
+					{
+						"ttyUSB0",
+						uint32(PortTypeQCDM),
+					},
+					{
+						"ttyUSB1",
+						uint32(PortTypeAT),
+					},
+					{
+						"wwp0s19u1u3i12",
+						uint32(PortTypeNet),
+					},
+				}),
+				"PrimaryPort": dbus.MakeVariant("cdc-wdm0"),
+				"Revision":    dbus.MakeVariant("SWI9X30C_02.33.03.00"),
 			}, nil
 		},
 	}
@@ -153,8 +171,26 @@ func TestClientModemOK(t *testing.T) {
 		Manufacturer:        "Sierra Wireless, Incorporated",
 		Model:               "Sierra Wireless MC7455 Qualcomm® Snapdragon™ X7 LTE-A",
 		Plugin:              "Sierra",
-		PrimaryPort:         "cdc-wdm0",
-		Revision:            "SWI9X30C_02.33.03.00",
+		Ports: []Port{
+			{
+				Name: "cdc-wdm0",
+				Type: PortTypeMBIM,
+			},
+			{
+				Name: "ttyUSB0",
+				Type: PortTypeQCDM,
+			},
+			{
+				Name: "ttyUSB1",
+				Type: PortTypeAT,
+			},
+			{
+				Name: "wwp0s19u1u3i12",
+				Type: PortTypeNet,
+			},
+		},
+		PrimaryPort: "cdc-wdm0",
+		Revision:    "SWI9X30C_02.33.03.00",
 	}
 
 	if diff := cmp.Diff(want, m, cmpopts.IgnoreUnexported(Modem{})); diff != "" {

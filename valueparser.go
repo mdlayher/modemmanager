@@ -52,3 +52,49 @@ func (vp *valueParser) String() string {
 
 	return s
 }
+
+// Ports parses the value as a slice of Ports.
+func (vp *valueParser) Ports() []Port {
+	if vp.err != nil {
+		return nil
+	}
+
+	// Ports data is packed in a slice of tuple slices with different data
+	// types, so unfortunately we have to use empty interfaces and type
+	// assertions:
+	//
+	// [["ttyUSB0", 1], ["wwan0", 2]], etc.
+
+	ss, ok := vp.v.([][]interface{})
+	if !ok {
+		vp.err = errors.New("value is not a ports list")
+		return nil
+	}
+
+	ps := make([]Port, 0, len(ss))
+	for _, s := range ss {
+		if len(s) != 2 {
+			vp.err = errors.New("invalid ports list slice")
+			return nil
+		}
+
+		name, ok := s[0].(string)
+		if !ok {
+			vp.err = errors.New("invalid port name string")
+			return nil
+		}
+
+		typ, ok := s[1].(uint32)
+		if !ok {
+			vp.err = errors.New("invalid port type uint32")
+			return nil
+		}
+
+		ps = append(ps, Port{
+			Name: name,
+			Type: PortType(typ),
+		})
+	}
+
+	return ps
+}

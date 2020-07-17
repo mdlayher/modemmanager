@@ -13,17 +13,57 @@ func Test_valueParserErrors(t *testing.T) {
 		fn   func(vp *valueParser)
 	}{
 		{
-			name: "bad float64",
+			name: "float64",
 			v:    dbus.MakeVariant("foo"),
 			fn: func(vp *valueParser) {
 				_ = vp.Float64()
 			},
 		},
 		{
-			name: "bad string",
+			name: "string",
 			v:    dbus.MakeVariant(1),
 			fn: func(vp *valueParser) {
 				_ = vp.String()
+			},
+		},
+		{
+			name: "ports type",
+			v:    dbus.MakeVariant(1),
+			fn: func(vp *valueParser) {
+				_ = vp.Ports()
+			},
+		},
+		{
+			name: "ports slice",
+			v: dbus.MakeVariant([][]interface{}{{
+				"foo",
+			}}),
+			fn: func(vp *valueParser) {
+				_ = vp.Ports()
+			},
+		},
+		{
+			name: "ports name",
+			v: dbus.MakeVariant([][]interface{}{
+				{
+					true,
+					1,
+				},
+			}),
+			fn: func(vp *valueParser) {
+				_ = vp.Ports()
+			},
+		},
+		{
+			name: "ports type",
+			v: dbus.MakeVariant([][]interface{}{
+				{
+					"foo",
+					true,
+				},
+			}),
+			fn: func(vp *valueParser) {
+				_ = vp.Ports()
 			},
 		},
 	}
