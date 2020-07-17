@@ -100,6 +100,7 @@ type Modem struct {
 	Model                        string
 	Plugin                       string
 	Ports                        []Port
+	PowerState                   PowerState
 	PrimaryPort                  string
 	Revision                     string
 	State                        State
@@ -107,7 +108,7 @@ type Modem struct {
 	c *Client
 }
 
-//go:generate stringer -type=PortType,State -output strings.go
+//go:generate stringer -type=PortType,PowerState,State -output strings.go
 
 // A PortType is the type of a modem port.
 type PortType int
@@ -130,6 +131,18 @@ type Port struct {
 	Name string
 	Type PortType
 }
+
+// A PowerState is the power state of a modem.
+type PowerState int
+
+// Possible PowerState values, taken from:
+// https://www.freedesktop.org/software/ModemManager/api/latest/ModemManager-Flags-and-Enumerations.html#MMModemPowerState.
+const (
+	PowerStateUnknown PowerState = iota
+	PowerStateOff
+	PowerStateLow
+	PowerStateOn
+)
 
 // A State is the state of a modem.
 type State int
@@ -307,6 +320,8 @@ func (m *Modem) parse(ps map[string]dbus.Variant) error {
 			m.Plugin = vp.String()
 		case "Ports":
 			m.Ports = vp.Ports()
+		case "PowerState":
+			m.PowerState = PowerState(vp.Int())
 		case "PrimaryPort":
 			m.PrimaryPort = vp.String()
 		case "Revision":
