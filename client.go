@@ -102,11 +102,12 @@ type Modem struct {
 	Ports                        []Port
 	PrimaryPort                  string
 	Revision                     string
+	State                        State
 
 	c *Client
 }
 
-//go:generate stringer -type=PortType -output strings.go
+//go:generate stringer -type=PortType,State -output strings.go
 
 // A PortType is the type of a modem port.
 type PortType int
@@ -114,8 +115,7 @@ type PortType int
 // Possible PortType values, taken from:
 // https://www.freedesktop.org/software/ModemManager/api/latest/ModemManager-Flags-and-Enumerations.html#MMModemPortType.
 const (
-	_ PortType = iota
-	PortTypeUnknown
+	PortTypeUnknown PortType = iota + 1
 	PortTypeNet
 	PortTypeAT
 	PortTypeQCDM
@@ -130,6 +130,27 @@ type Port struct {
 	Name string
 	Type PortType
 }
+
+// A State is the state of a modem.
+type State int
+
+// Possible State values, taken from:
+// https://www.freedesktop.org/software/ModemManager/api/latest/ModemManager-Flags-and-Enumerations.html#MMModemState.
+const (
+	StateFailed State = iota - 1
+	StateUnknown
+	StateInitializing
+	StateLocked
+	StateDisabled
+	StateDisabling
+	StateEnabling
+	StateEnabled
+	StateSearching
+	StateRegistered
+	StateDisconnecting
+	StateConnecting
+	StateConnected
+)
 
 // Modem fetches a Modem identified by an index. If the modem does not exist,
 // an error compatible with 'errors.Is(err, os.ErrNotExist)' is returned.
@@ -290,6 +311,8 @@ func (m *Modem) parse(ps map[string]dbus.Variant) error {
 			m.PrimaryPort = vp.String()
 		case "Revision":
 			m.Revision = vp.String()
+		case "State":
+			m.State = State(vp.Int())
 		}
 
 		if err := vp.Err(); err != nil {

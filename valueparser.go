@@ -2,6 +2,7 @@ package modemmanager
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/godbus/dbus/v5"
 )
@@ -36,6 +37,23 @@ func (vp *valueParser) Float64() float64 {
 	}
 
 	return f
+}
+
+// Int parses an int32 or uint32 value as a Go int.
+func (vp *valueParser) Int() int {
+	if vp.err != nil {
+		return 0
+	}
+
+	switch v := vp.v.(type) {
+	case uint32:
+		return int(v)
+	case int32:
+		return int(v)
+	default:
+		vp.err = fmt.Errorf("value is not a valid integer: %T", v)
+		return 0
+	}
 }
 
 // String parses the value as a string.

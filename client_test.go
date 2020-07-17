@@ -154,6 +154,7 @@ func TestClientModemOK(t *testing.T) {
 				}),
 				"PrimaryPort": dbus.MakeVariant("cdc-wdm0"),
 				"Revision":    dbus.MakeVariant("SWI9X30C_02.33.03.00"),
+				"State":       dbus.MakeVariant(int32(StateConnected)),
 			}, nil
 		},
 	}
@@ -191,6 +192,7 @@ func TestClientModemOK(t *testing.T) {
 		},
 		PrimaryPort: "cdc-wdm0",
 		Revision:    "SWI9X30C_02.33.03.00",
+		State:       StateConnected,
 	}
 
 	if diff := cmp.Diff(want, m, cmpopts.IgnoreUnexported(Modem{})); diff != "" {

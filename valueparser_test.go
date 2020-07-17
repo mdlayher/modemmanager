@@ -20,6 +20,13 @@ func Test_valueParserErrors(t *testing.T) {
 			},
 		},
 		{
+			name: "int",
+			v:    dbus.MakeVariant(1.0),
+			fn: func(vp *valueParser) {
+				_ = vp.Int()
+			},
+		},
+		{
 			name: "string",
 			v:    dbus.MakeVariant(1),
 			fn: func(vp *valueParser) {
