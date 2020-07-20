@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -400,6 +401,51 @@ func TestModemSignal(t *testing.T) {
 
 	if diff := cmp.Diff(want, signal); diff != "" {
 		t.Fatalf("unexpected Signal (-want +got):\n%s", diff)
+	}
+}
+
+func TestModemBearers(t *testing.T) {
+	m := &Modem{
+		// Verify all of the expected inputs before returning canned properties.
+		c: &Client{getAll: func(_ context.Context, op dbus.ObjectPath, dInterface string) (map[string]dbus.Variant, error) {
+			if !strings.HasPrefix(string(op), "/org/freedesktop/ModemManager1/Bearer/") {
+				t.Fatalf("unexpected object path: %q", op)
+			}
+
+			if diff := cmp.Diff("org.freedesktop.ModemManager1.Bearer", dInterface); diff != "" {
+				t.Fatalf("unexpected interface (-want +got):\n%s", diff)
+			}
+
+			// Test data copied from mdlayher's modem with some tweaks.
+			return map[string]dbus.Variant{
+				"Connected": dbus.MakeVariant(true),
+			}, nil
+		}},
+
+		bearers: []dbus.ObjectPath{
+			"/org/freedesktop/ModemManager1/Bearer/0",
+			"/org/freedesktop/ModemManager1/Bearer/1",
+		},
+	}
+
+	bearers, err := m.Bearers(context.Background())
+	if err != nil {
+		t.Fatalf("failed to get bearers: %v", err)
+	}
+
+	want := []*Bearer{
+		{
+			Index:     0,
+			Connected: true,
+		},
+		{
+			Index:     1,
+			Connected: true,
+		},
+	}
+
+	if diff := cmp.Diff(want, bearers, cmpopts.IgnoreUnexported(Bearer{})); diff != "" {
+		t.Fatalf("unexpected Bearers (-want +got):\n%s", diff)
 	}
 }
 
