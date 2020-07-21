@@ -317,6 +317,17 @@ func TestIntegrationClient(t *testing.T) {
 			return err
 		}
 
+		bearers, err := m.Bearers(ctx)
+		if err != nil {
+			return err
+		}
+
+		t.Logf("  - bearers:")
+		for _, b := range bearers {
+			t.Logf("    - %d: %s (connected: %t, IPv4: %s, IPv6: %s)",
+				b.Index, b.Interface, b.Connected, b.IPv4Config.Address, b.IPv6Config.Address)
+		}
+
 		return nil
 	})
 	if err != nil {
