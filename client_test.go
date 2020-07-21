@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"strings"
 	"testing"
 	"time"
@@ -416,9 +417,17 @@ func TestModemBearers(t *testing.T) {
 				t.Fatalf("unexpected interface (-want +got):\n%s", diff)
 			}
 
+			// Only return full properties for the first bearer.
+			if path.Base(string(op)) != "0" {
+				return nil, nil
+			}
+
 			// Test data copied from mdlayher's modem with some tweaks.
 			return map[string]dbus.Variant{
 				"Connected": dbus.MakeVariant(true),
+				"Interface": dbus.MakeVariant("wwan0"),
+				"IpTimeout": dbus.MakeVariant(uint32(20)),
+				"Suspended": dbus.MakeVariant(false),
 			}, nil
 		}},
 
@@ -437,10 +446,13 @@ func TestModemBearers(t *testing.T) {
 		{
 			Index:     0,
 			Connected: true,
+			Interface: "wwan0",
+			IPTimeout: 20 * time.Second,
+			Suspended: false,
 		},
 		{
 			Index:     1,
-			Connected: true,
+			Connected: false,
 		},
 	}
 

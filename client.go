@@ -219,6 +219,9 @@ func (c *Client) ForEachModem(ctx context.Context, fn func(ctx context.Context, 
 type Bearer struct {
 	Index     int
 	Connected bool
+	Interface string
+	IPTimeout time.Duration
+	Suspended bool
 
 	c *Client
 }
@@ -396,6 +399,12 @@ func (b *Bearer) parse(ps map[string]dbus.Variant) error {
 		switch k {
 		case "Connected":
 			b.Connected = vp.Bool()
+		case "Interface":
+			b.Interface = vp.String()
+		case "IpTimeout":
+			b.IPTimeout = time.Duration(vp.Int()) * time.Second
+		case "Suspended":
+			b.Suspended = vp.Bool()
 		}
 
 		if err := vp.Err(); err != nil {
