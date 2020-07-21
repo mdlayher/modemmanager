@@ -2,6 +2,7 @@ package modemmanager
 
 import (
 	"context"
+	"net"
 	"path"
 	"strings"
 	"testing"
@@ -34,6 +35,22 @@ func TestModemBearers(t *testing.T) {
 				"Connected": dbus.MakeVariant(true),
 				"Interface": dbus.MakeVariant("wwan0"),
 				"IpTimeout": dbus.MakeVariant(uint32(20)),
+				"Ip4Config": dbus.MakeVariant(map[string]dbus.Variant{
+					"address": dbus.MakeVariant("192.0.2.10"),
+					"dns1":    dbus.MakeVariant("192.0.2.0"),
+					"dns2":    dbus.MakeVariant("192.0.2.1"),
+					"gateway": dbus.MakeVariant("192.0.2.0"),
+					"mtu":     dbus.MakeVariant(uint32(1500)),
+					"prefix":  dbus.MakeVariant(uint32(24)),
+				}),
+				"Ip6Config": dbus.MakeVariant(map[string]dbus.Variant{
+					"address": dbus.MakeVariant("2001:db8::10"),
+					"dns1":    dbus.MakeVariant("2001:db8::"),
+					"dns2":    dbus.MakeVariant("2001:db8::1"),
+					"gateway": dbus.MakeVariant("2001:db8::"),
+					"mtu":     dbus.MakeVariant(uint32(1500)),
+					"prefix":  dbus.MakeVariant(uint32(64)),
+				}),
 				"Suspended": dbus.MakeVariant(false),
 			}, nil
 		}},
@@ -55,6 +72,30 @@ func TestModemBearers(t *testing.T) {
 			Connected: true,
 			Interface: "wwan0",
 			IPTimeout: 20 * time.Second,
+			IPv4Config: &IPConfig{
+				Address: net.IPNet{
+					IP:   net.IPv4(192, 0, 2, 10),
+					Mask: net.CIDRMask(24, 32),
+				},
+				DNS: []net.IP{
+					net.IPv4(192, 0, 2, 0),
+					net.IPv4(192, 0, 2, 1),
+				},
+				Gateway: net.IPv4(192, 0, 2, 0),
+				MTU:     1500,
+			},
+			IPv6Config: &IPConfig{
+				Address: net.IPNet{
+					IP:   net.ParseIP("2001:db8::10"),
+					Mask: net.CIDRMask(64, 128),
+				},
+				DNS: []net.IP{
+					net.ParseIP("2001:db8::"),
+					net.ParseIP("2001:db8::1"),
+				},
+				Gateway: net.ParseIP("2001:db8::"),
+				MTU:     1500,
+			},
 			Suspended: false,
 		},
 		{

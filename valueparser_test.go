@@ -34,6 +34,27 @@ func Test_valueParserErrors(t *testing.T) {
 			},
 		},
 		{
+			name: "IP type",
+			v:    dbus.MakeVariant(1.0),
+			fn: func(vp *valueParser) {
+				_ = vp.IP()
+			},
+		},
+		{
+			name: "IP invalid",
+			v:    dbus.MakeVariant("foo"),
+			fn: func(vp *valueParser) {
+				_ = vp.IP()
+			},
+		},
+		{
+			name: "mask",
+			v:    dbus.MakeVariant(1.0),
+			fn: func(vp *valueParser) {
+				_ = vp.Mask(128)
+			},
+		},
+		{
 			name: "string",
 			v:    dbus.MakeVariant(1),
 			fn: func(vp *valueParser) {

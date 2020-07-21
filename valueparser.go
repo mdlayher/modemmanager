@@ -3,6 +3,7 @@ package modemmanager
 import (
 	"errors"
 	"fmt"
+	"net"
 
 	"github.com/godbus/dbus/v5"
 )
@@ -69,6 +70,43 @@ func (vp *valueParser) Int() int {
 		vp.err = fmt.Errorf("value is not a valid integer: %T", v)
 		return 0
 	}
+}
+
+// IP parses a value as a net.IP
+func (vp *valueParser) IP() net.IP {
+	if vp.err != nil {
+		return nil
+	}
+
+	s, ok := vp.v.(string)
+	if !ok {
+		vp.err = errors.New("value for IP is not of type string")
+		return nil
+	}
+
+	ip := net.ParseIP(s)
+	if ip == nil {
+		vp.err = fmt.Errorf("invalid IP address: %q", s)
+		return nil
+	}
+
+	return ip
+}
+
+// Mask parses a value as an IP address mask.
+func (vp *valueParser) Mask(bits int) net.IPMask {
+	// IP parses a value as a net.IP
+	if vp.err != nil {
+		return nil
+	}
+
+	i, ok := vp.v.(uint32)
+	if !ok {
+		vp.err = errors.New("value for IP mask is not of type uint32")
+		return nil
+	}
+
+	return net.CIDRMask(int(i), bits)
 }
 
 // String parses the value as a string.
@@ -142,6 +180,21 @@ func (vp *valueParser) Ports() []Port {
 			Name: name,
 			Type: PortType(typ),
 		})
+	}
+
+	return ps
+}
+
+// Properties parses a value as a D-Bus properties map.
+func (vp *valueParser) Properties() map[string]dbus.Variant {
+	if vp.err != nil {
+		return nil
+	}
+
+	ps, ok := vp.v.(map[string]dbus.Variant)
+	if !ok {
+		vp.err = errors.New("value is not a D-Bus properties map")
+		return nil
 	}
 
 	return ps
