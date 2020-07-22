@@ -35,8 +35,6 @@ type Modem struct {
 	bearers []dbus.ObjectPath
 }
 
-//go:generate stringer -type=PortType,PowerState,State -output strings.go
-
 // A PortType is the type of a modem port.
 type PortType int
 

@@ -25,13 +25,25 @@ type Bearer struct {
 	c *Client
 }
 
-// TODO: method enum.
+// A BearerIPMethod is the method a Bearer must use to obtain IP address
+// configuration.
+type BearerIPMethod int
+
+// Possible BearerIPMethod values, taken from:
+// https://www.freedesktop.org/software/ModemManager/api/latest/ModemManager-Flags-and-Enumerations.html#MMBearerIpMethod.
+const (
+	BearerIPMethodUnknown BearerIPMethod = iota
+	BearerIPMethodPPP
+	BearerIPMethodStatic
+	BearerIPMethodDHCP
+)
 
 // An IPConfig is a Bearer's IPv4 or IPv6 configuration.
 type IPConfig struct {
-	Address net.IPNet
+	Address *net.IPNet
 	DNS     []net.IP
 	Gateway net.IP
+	Method  BearerIPMethod
 	MTU     int
 }
 
@@ -128,14 +140,24 @@ func parseIPConfig(ps map[string]dbus.Variant, ip6 bool) (*IPConfig, error) {
 		vp := newValueParser(v)
 		switch k {
 		case "address":
+			if c.Address == nil {
+				c.Address = &net.IPNet{}
+			}
+
 			c.Address.IP = vp.IP()
 		case "dns1", "dns2", "dns3":
 			c.DNS = append(c.DNS, vp.IP())
 		case "gateway":
 			c.Gateway = vp.IP()
+		case "method":
+			c.Method = BearerIPMethod(vp.Int())
 		case "mtu":
 			c.MTU = vp.Int()
 		case "prefix":
+			if c.Address == nil {
+				c.Address = &net.IPNet{}
+			}
+
 			c.Address.Mask = vp.Mask(bits)
 		}
 	}

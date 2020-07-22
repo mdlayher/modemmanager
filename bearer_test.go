@@ -40,6 +40,7 @@ func TestModemBearers(t *testing.T) {
 					"dns1":    dbus.MakeVariant("192.0.2.0"),
 					"dns2":    dbus.MakeVariant("192.0.2.1"),
 					"gateway": dbus.MakeVariant("192.0.2.0"),
+					"method":  dbus.MakeVariant(uint32(BearerIPMethodStatic)),
 					"mtu":     dbus.MakeVariant(uint32(1500)),
 					"prefix":  dbus.MakeVariant(uint32(24)),
 				}),
@@ -48,6 +49,7 @@ func TestModemBearers(t *testing.T) {
 					"dns1":    dbus.MakeVariant("2001:db8::"),
 					"dns2":    dbus.MakeVariant("2001:db8::1"),
 					"gateway": dbus.MakeVariant("2001:db8::"),
+					"method":  dbus.MakeVariant(uint32(BearerIPMethodStatic)),
 					"mtu":     dbus.MakeVariant(uint32(1500)),
 					"prefix":  dbus.MakeVariant(uint32(64)),
 				}),
@@ -73,7 +75,7 @@ func TestModemBearers(t *testing.T) {
 			Interface: "wwan0",
 			IPTimeout: 20 * time.Second,
 			IPv4Config: &IPConfig{
-				Address: net.IPNet{
+				Address: &net.IPNet{
 					IP:   net.IPv4(192, 0, 2, 10),
 					Mask: net.CIDRMask(24, 32),
 				},
@@ -82,10 +84,11 @@ func TestModemBearers(t *testing.T) {
 					net.IPv4(192, 0, 2, 1),
 				},
 				Gateway: net.IPv4(192, 0, 2, 0),
+				Method:  BearerIPMethodStatic,
 				MTU:     1500,
 			},
 			IPv6Config: &IPConfig{
-				Address: net.IPNet{
+				Address: &net.IPNet{
 					IP:   net.ParseIP("2001:db8::10"),
 					Mask: net.CIDRMask(64, 128),
 				},
@@ -94,6 +97,7 @@ func TestModemBearers(t *testing.T) {
 					net.ParseIP("2001:db8::1"),
 				},
 				Gateway: net.ParseIP("2001:db8::"),
+				Method:  BearerIPMethodStatic,
 				MTU:     1500,
 			},
 			Suspended: false,
