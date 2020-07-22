@@ -20,6 +20,7 @@ type Bearer struct {
 	Interface              string
 	IPTimeout              time.Duration
 	IPv4Config, IPv6Config *IPConfig
+	Stats                  *BearerStats
 	Suspended              bool
 
 	c *Client
@@ -45,6 +46,13 @@ type IPConfig struct {
 	Gateway net.IP
 	Method  BearerIPMethod
 	MTU     int
+}
+
+// BearerStats contains statistics for a Bearer.
+type BearerStats struct {
+	Attempts, FailedAttempts                     int
+	Duration, TotalDuration                      time.Duration
+	RXBytes, TXBytes, TotalRXBytes, TotalTXBytes uint64
 }
 
 // Bearers returns all of the Bearers for a Modem.
@@ -114,6 +122,12 @@ func (b *Bearer) parse(ps map[string]dbus.Variant) error {
 				return fmt.Errorf("error parsing IPv6 config: %v", err)
 			}
 			b.IPv6Config = c
+		case "Stats":
+			bs, err := parseBearerStats(vp.Properties())
+			if err != nil {
+				return fmt.Errorf("error parsing bearer stats: %v", err)
+			}
+			b.Stats = bs
 		case "Suspended":
 			b.Suspended = vp.Bool()
 		}
@@ -160,6 +174,10 @@ func parseIPConfig(ps map[string]dbus.Variant, ip6 bool) (*IPConfig, error) {
 
 			c.Address.Mask = vp.Mask(bits)
 		}
+
+		if err := vp.Err(); err != nil {
+			return nil, fmt.Errorf("error parsing %q: %v", k, err)
+		}
 	}
 
 	// Sort DNS addresses for consistency.
@@ -168,4 +186,36 @@ func parseIPConfig(ps map[string]dbus.Variant, ip6 bool) (*IPConfig, error) {
 	})
 
 	return &c, nil
+}
+
+// parseBearerStats parses BearerStats from a properties map.
+func parseBearerStats(ps map[string]dbus.Variant) (*BearerStats, error) {
+	var bs BearerStats
+	for k, v := range ps {
+		vp := newValueParser(v)
+		switch k {
+		case "attempts":
+			bs.Attempts = vp.Int()
+		case "failed-attempts":
+			bs.FailedAttempts = vp.Int()
+		case "duration":
+			bs.Duration = time.Duration(vp.Int()) * time.Second
+		case "total-duration":
+			bs.TotalDuration = time.Duration(vp.Int()) * time.Second
+		case "rx-bytes":
+			bs.RXBytes = vp.Uint64()
+		case "tx-bytes":
+			bs.TXBytes = vp.Uint64()
+		case "total-rx-bytes":
+			bs.TotalRXBytes = vp.Uint64()
+		case "total-tx-bytes":
+			bs.TotalTXBytes = vp.Uint64()
+		}
+
+		if err := vp.Err(); err != nil {
+			return nil, fmt.Errorf("error parsing %q: %v", k, err)
+		}
+	}
+
+	return &bs, nil
 }

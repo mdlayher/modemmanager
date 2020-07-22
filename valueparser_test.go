@@ -62,6 +62,13 @@ func Test_valueParserErrors(t *testing.T) {
 			},
 		},
 		{
+			name: "uint64",
+			v:    dbus.MakeVariant("foo"),
+			fn: func(vp *valueParser) {
+				_ = vp.Uint64()
+			},
+		},
+		{
 			name: "object paths",
 			v:    dbus.MakeVariant(1),
 			fn: func(vp *valueParser) {

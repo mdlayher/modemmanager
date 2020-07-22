@@ -124,6 +124,21 @@ func (vp *valueParser) String() string {
 	return s
 }
 
+// Uint64 parses the value as a uint64.
+func (vp *valueParser) Uint64() uint64 {
+	if vp.err != nil {
+		return 0
+	}
+
+	u, ok := vp.v.(uint64)
+	if !ok {
+		vp.err = errors.New("value is not of type uint64")
+		return 0
+	}
+
+	return u
+}
+
 // ObjectPaths parses the value as a slice of dbus.ObjectPaths.
 func (vp *valueParser) ObjectPaths() []dbus.ObjectPath {
 	if vp.err != nil {
